@@ -61,15 +61,14 @@ class DeviceClient(ClientXMPP):
         self.add_nodes() 
         
     def add_nodes(self):
-        #TODO query datapoints and create nodes
+        'query datapoints and create nodes'
         
-        name='My node'
-        node='mynode'
-        subnode = 'mysubnode'
-        subname='My sub node'
+        devs = self.homematic.getDevices()
         
-        self._add_node(node,name)
-        self._add_node(subnode, subname, node)
+        for device in devs:
+            self._add_node(device.ise,device.name)
+            for (snode,sname) in device.subnodes.items():
+                self._add_node(snode, sname, device.ise)
         
     def _add_node(self,node='',name='',parent=None):
         disco = self['xep_0030']
