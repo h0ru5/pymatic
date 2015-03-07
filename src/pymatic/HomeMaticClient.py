@@ -40,16 +40,5 @@ class HomeMaticClient(object):
         return self.getXmlObject('runprogram',qs)
         
       
-if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG,
-                        format='%(levelname)-8s %(message)s')
-    
-    hm  = HomeMaticClient('192.168.178.20')
-    ls = hm.getPrograms()
-
-    for program in ls:
-        logging.debug("%(id)s: %(name)s",program)
-    
-    hm.runProgram(1681)
     
     

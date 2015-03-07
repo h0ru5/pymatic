@@ -9,11 +9,7 @@ import sys
 
 from sleekxmpp import ClientXMPP
 from sleekxmpp.exceptions import IqError, IqTimeout
-from de.johanneshund.homematic import HomeMaticClient
-from ConfigParser import SafeConfigParser
-import os
-
-
+from pymatic.HomeMaticClient import HomeMaticClient
 
 # Python versions before 3.0 do not use UTF-8 encoding
 # by default. To ensure that Unicode is handled properly
@@ -39,7 +35,7 @@ class DeviceClient(ClientXMPP):
         self.register_plugin('xep_0050') # Ad-hoc commands
         self.register_plugin('xep_0004') # Dataforms
         
-        self.homematic = HomeMaticClient.HomeMaticClient(hmhost)
+        self.homematic = HomeMaticClient(hmhost)
         
         # Here's how to access plugins once you've registered them:
         # self['xep_0030'].add_feature('echo_demo')
@@ -111,22 +107,7 @@ class DeviceClient(ClientXMPP):
         return session
             
     def message(self, msg):
+        #instead of just being rude, this will be a text-interface
         if msg['type'] in ('chat', 'normal'):
             msg.reply("%(body)s yourself!" % msg).send()
 
-if __name__ == '__main__':
-    
-    config = SafeConfigParser()
-    fn = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'pymatic.ini')
-    config.read(fn)
-    
-    logging.basicConfig(level=logging.DEBUG,
-                        format='%(levelname)-8s %(message)s')
-    
-    jid = config.get('xmpp','jid')
-    passwd = config.get('xmpp','pass')
-    homematic = config.get('homematic','host')
-        
-    xmpp = DeviceClient(jid + '/homematic', passwd,homematic)
-    xmpp.connect()
-    xmpp.process(block=True)
