@@ -24,6 +24,6 @@ if __name__ == '__main__':
     passwd = config.get('xmpp','pass')
     homematic = config.get('homematic','host')
         
-    xmpp = DeviceClient(jid + '/homematic', passwd,homematic)
+    xmpp = DeviceClient(jid + '/homematic-dev', passwd,homematic)
     xmpp.connect()
     xmpp.process(block=True)

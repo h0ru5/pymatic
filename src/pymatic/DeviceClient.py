@@ -75,7 +75,12 @@ class DeviceClient(ClientXMPP):
         jid = self.boundjid
         item_jid = jid.full
         
-        disco.add_item(jid=item_jid,name=name,node=parent,subnode=node,ijid=jid)
+        if not parent == None: 
+            fullnode = "%s/%s" % (parent,node)
+        else:
+            fullnode = node
+        
+        disco.add_item(jid=item_jid,name=name,node=parent,subnode=fullnode,ijid=jid)
         disco.add_identity(category='automation',itype='device-node',name=name,node=node,jid=jid)
         
     

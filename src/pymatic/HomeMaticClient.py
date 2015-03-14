@@ -19,6 +19,7 @@ class HomeMaticClient(object):
     def __init__(self, host):
          self.host = host
          self.PLACEHOLDER="http://%s/config/xmlapi/%s.cgi"
+         self.devs = self.getDevices()
 
     def _getUrl(self,action):
         return self.PLACEHOLDER % (self.host, action)
@@ -33,25 +34,41 @@ class HomeMaticClient(object):
         return ET.fromstring(xml)
     
     def getResultList(self,action,query=None):
-        rlist = self._getXmlObject(action)       
+        rlist = self._getXmlObject(action,query)       
         return [child.attrib for child in rlist]
     
     def getPrograms(self):
         return self.getResultList('programlist')       
         
-    def runProgram(self,id):
-        qs = {'program_id' : id}
+    def runProgram(self,progid):
+        qs = {'program_id' : progid}
         return self._getXmlObject('runprogram',qs)
     
     def getDevicesRaw(self):
         return self.getResultList('devicelist')       
         
     def getDevices(self):
-        rdevs=self.getResultList('devicelist')
-        return map(hmdevs.getDetails, rdevs)
+        return [hmdevs.createDeviceProxy(self, rdev) for rdev in self.getResultList('devicelist')]
+    
+    def getDataPoints(self,deviceid=None):
+        if deviceid == None:
+            datapoints = self._getXmlObject('statelist').getiterator('datapoint')
+        else:
+            datapoints = self._getXmlObject('state', {'device_id' : deviceid}).getiterator('datapoint')
+        return {dp.attrib['type']:dp.attrib for dp in datapoints}
         
-if __name__ == '__main__':      
+    
+        
+if __name__ == '__main__':
+    #quick tests
+    import sys
+    if sys.version_info < (3, 0):
+        from sleekxmpp.util.misc_ops import setdefaultencoding
+        setdefaultencoding('utf8')
+    else:
+        raw_input = input
+      
     logging.basicConfig(level=logging.DEBUG,
                         format='%(levelname)-8s %(message)s')
-    hm = HomeMaticClient('192.168.178.20')
-    print hm.getDevices()    
+    
+        
