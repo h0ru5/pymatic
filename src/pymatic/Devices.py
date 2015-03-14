@@ -5,6 +5,7 @@ Created on 07.03.2015
 '''
 
 import logging
+from sleekxmpp.plugins.xep_0030.stanza.items import DiscoItems
 
 def createDeviceProxy(hmc,ddict):
     dtype = ddict['device_type']
@@ -23,33 +24,51 @@ class Device(object):
     '''
 
     type='unkown'
+    hmc = None
     
     def __init__(self, hmc, ddict):
         '''
         Constructor
         '''
-        self.data = {}
-        self.ise=-1
-        self.name=''
+        self.ddict = ddict
         self.type = ddict['device_type']
         self.ise = ddict['ise_id']
         self.name = ddict['name']
-        self.ddict = ddict
+        
         self.subnodes = {}
-        self.update(hmc)
+        self.data = {}
+        self.hmc = hmc
+        self.update()
         
     def _toValue(self,dptype):
         return self.data[dptype]['value']
             
-    def update(self,hmc):
-        self.data = hmc.getDataPoints(self.ise)
+    def update(self):
+        self.data = self.hmc.getDataPoints(self.ise)
         self.rssi = self._toValue('RSSI_DEVICE')
         self.rssi_peer = self._toValue('RSSI_DEVICE')
         self.await_conf = self._toValue('CONFIG_PENDING')
+        self.subnodes['rssi'] = 'Signalstaerke: %s' % self.rssi
         self._updateState()
     
+    def handleItems(self, jid, node, ifrom):
+        'return info for device subnode (=datapoint)'
+        logging.debug('custom node info request for %s -> %s', node, self.name)
+        self.update()
+        items = DiscoItems()
+        for (snode,sname) in self.subnodes.iteritems():
+            items.add_item(jid.full, node + "/" + snode, sname)
+        
+        return items
+        
+        #dissect ise and subnode
+        # if has subnode return not found
+        # else
+        # update
+        # return subnodes with datapoint infos as name
+        
     def _updateState(self):
-        'overridden by subclasses - does spython have abstract class?'
+        'overridden by subclasses - does python have abstract class?'
         pass        
         
 class Thermostat(Device):
@@ -75,7 +94,6 @@ class Blinds(Device):
         Device.__init__(self,hmc,ddict)
         logging.debug("found Blinds %r at %s",self.name,self.ise)
         
-    
     def _updateState(self):
         self.level = self._toValue('LEVEL')
         self.subnodes['lvl'] = 'Level %s' % self.level

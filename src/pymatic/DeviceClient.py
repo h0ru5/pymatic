@@ -69,9 +69,17 @@ class DeviceClient(ClientXMPP):
         devs = self.homematic.getDevices()
         
         for device in devs:
+            
             self._add_node(device.ise,device.name)
+            self['xep_0030'].set_node_handler('get_items'
+                                       ,jid=self.boundjid.full
+                                       ,node=device.ise
+                                       ,handler=device.handleItems
+                                       )
             for (snode,sname) in device.subnodes.items():
                 self._add_node(snode, sname, device.ise)
+    
+                 
         
     def _add_node(self,node='',name='',parent=None):
         disco = self['xep_0030']
@@ -84,7 +92,7 @@ class DeviceClient(ClientXMPP):
             fullnode = node
         
         disco.add_item(jid=item_jid,name=name,node=parent,subnode=fullnode,ijid=jid)
-        disco.add_identity(category='automation',itype='device-node',name=name,node=node,jid=jid)
+        disco.add_identity(category='automation',itype='device-node',name=name,node=fullnode,jid=jid)
             
     def add_commands(self):
         self['xep_0050'].add_command(node='programslist',

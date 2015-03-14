@@ -55,8 +55,7 @@ class HomeMaticClient(object):
             datapoints = self._getXmlObject('statelist').getiterator('datapoint')
         else:
             datapoints = self._getXmlObject('state', {'device_id' : deviceid}).getiterator('datapoint')
-        return {dp.attrib['type']:dp.attrib for dp in datapoints}
-        
+        return {dp.attrib['type']:dp.attrib for dp in datapoints} 
     
         
 if __name__ == '__main__':
