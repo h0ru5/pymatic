@@ -10,6 +10,7 @@ import sys
 from sleekxmpp import ClientXMPP
 from sleekxmpp.exceptions import IqError, IqTimeout
 from pymatic.HomeMaticClient import HomeMaticClient
+from sleekxmpp.jid import JID
 
 # Python versions before 3.0 do not use UTF-8 encoding
 # by default. To ensure that Unicode is handled properly
@@ -20,6 +21,7 @@ if sys.version_info < (3, 0):
     setdefaultencoding('utf8')
 else:
     raw_input = input
+
 
 class DeviceClient(ClientXMPP):
 
@@ -37,8 +39,9 @@ class DeviceClient(ClientXMPP):
         
         self.homematic = HomeMaticClient(hmhost)
         
-        # Here's how to access plugins once you've registered them:
-        # self['xep_0030'].add_feature('echo_demo')
+        # specify owner JID, * for everybody
+        self.owner ='*' 
+        
 
     def session_start(self, event):
         self.send_presence()
@@ -82,8 +85,7 @@ class DeviceClient(ClientXMPP):
         
         disco.add_item(jid=item_jid,name=name,node=parent,subnode=fullnode,ijid=jid)
         disco.add_identity(category='automation',itype='device-node',name=name,node=node,jid=jid)
-        
-    
+            
     def add_commands(self):
         self['xep_0050'].add_command(node='programslist',
                                      name='List programs',
@@ -100,11 +102,24 @@ class DeviceClient(ClientXMPP):
         session['notes'] = [('info','\n'.join(plist))]
         return session
         
+
+    def _verify(self, caller):
+        'verify that caller is egligable to run the program, currently matches against owner'
+        if(self.owner == '*'):
+            return True
+        else:
+            return JID(caller).bare == self.owner
+            
+    
     def _handle_hmprog_cmd(self,iq,session):
-        logging.info('calling homematic program %(node)s',session)
+        logging.info('calling homematic program %(node)s for %(from)s',session)
+
+        if not self._verify(session['from']):
+            session['notes'] = [('error','Not Authorized')]
+            return session
+
         try:
             self.homematic.runProgram(session['node'])
-            print session
             session['notes'] =  [('info','OK')]
         except Exception as err:
             session['notes'] = [('error',err)]            

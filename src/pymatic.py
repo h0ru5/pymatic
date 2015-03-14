@@ -9,9 +9,13 @@ import logging
 import os
 
 from pymatic.DeviceClient import DeviceClient
+from sleekxmpp.jid import JID
 
 
 if __name__ == '__main__':
+    defauls = {
+                'owner' : '*'
+               }
     
     config = SafeConfigParser()
     fn = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'pymatic.ini')
@@ -23,7 +27,10 @@ if __name__ == '__main__':
     jid = config.get('xmpp','jid')
     passwd = config.get('xmpp','pass')
     homematic = config.get('homematic','host')
+    
+    fulljid = JID(jid)
         
-    xmpp = DeviceClient(jid + '/homematic-dev', passwd,homematic)
+    xmpp = DeviceClient(fulljid, passwd,homematic)
+    xmpp.owner = config.get('homematic','owner') 
     xmpp.connect()
     xmpp.process(block=True)
