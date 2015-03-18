@@ -11,6 +11,7 @@ from sleekxmpp import ClientXMPP
 from sleekxmpp.exceptions import IqError, IqTimeout
 from pymatic.HomeMaticClient import HomeMaticClient
 from sleekxmpp.jid import JID
+from sleekxmpp.plugins.xep_0050.stanza import Command
 
 # Python versions before 3.0 do not use UTF-8 encoding
 # by default. To ensure that Unicode is handled properly
@@ -76,6 +77,8 @@ class DeviceClient(ClientXMPP):
                                        ,node=device.ise
                                        ,handler=device.handleItems
                                        )
+            device.add_commands(self)
+            
             for (snode,sname) in device.subnodes.items():
                 self._add_node(snode, sname, device.ise)
     
