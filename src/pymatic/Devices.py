@@ -31,6 +31,7 @@ class Device(object):
         '''
         Constructor
         '''
+        self.hmc = hmc
         self.ddict = ddict
         self.type = ddict['device_type']
         self.ise = ddict['ise_id']
@@ -38,8 +39,11 @@ class Device(object):
         
         self.subnodes = {}
         self.data = {}
-        self.hmc = hmc
-        self.update()
+        self.writable_dps = []
+        self.exposed_dps = []
+        
+        self.exposed_dps.append('RSSI_PEER')
+        self.exposed_dps.append('RSSI_DEVICE')
         
     def _toValue(self,dptype):
         return self.data[dptype]['value']
@@ -49,12 +53,10 @@ class Device(object):
         self.rssi_peer = self._toValue('RSSI_PEER')
         self.await_conf = self._toValue('CONFIG_PENDING')
         self.rssi = self._toValue('RSSI_DEVICE')
-        
-        dptype='RSSI_DEVICE'
-        # maybe I just output the type instead of pretty nanme
-        #for (dptype,name) in {'RSSI_DEVICE':'Signalstaerke'}:
-        dp = self.data[dptype]
-        self.subnodes[dp['ise_id']] = '%(type)s: %(value)s %(valueunit)s' % dp
+
+        for dptype in self.exposed_dps:
+            dp = self.data[dptype]
+            self.subnodes[dp['ise_id']] = '%(type)s: %(value)s %(valueunit)s' % dp
         
         self._updateState()
     
@@ -65,16 +67,16 @@ class Device(object):
         items = DiscoItems()
         for (snode,sname) in self.subnodes.iteritems():
             items.add_item(jid.full, node + "/" + snode, sname)
-        
         return items
         
     def add_commands(self, xmpp):
         'adds commands for this device'
         self.xmpp = xmpp
-        xmpp['xep_0050'].add_command(node=self.ise,
-                                     name='info for %s' % self.name,
-                                     handler=self._handle_cmd_info)
-        xmpp['xep_0030'].add_feature(Command.namespace,self.ise,xmpp.boundjid)
+        for dptype in self.writable_dps:
+            subnode = self.data[dptype]['ise_id']
+            xmpp['xep_0050'].add_command(node=self.ise + '/' + subnode,
+                                         handler=self._handle_cmd_ctrl_start)
+            xmpp['xep_0030'].add_feature(Command.namespace,self.ise + '/' + subnode,xmpp.boundjid)
     
     def _handle_cmd_info(self, iq,session):
         'handle info command'
@@ -88,46 +90,9 @@ class Device(object):
         session['notes'] = [('info','\n'.join(rlist))]
         return session
         
-        
     def _updateState(self):
         'overridden by subclasses - does python have abstract class?'
         pass        
-    
-    def setValue(self,dptype,value):
-        ise=self.data[dptype]['ise_id']
-        self.hmc.setDataPoint(ise,value)
-    
-class Thermostat(Device):
-    dtype='HM-CC-RT-DN'
-    def __init__(self,hmc,ddict):
-        Device.__init__(self,hmc,ddict)
-        logging.debug("found Thermostat %r at %s",self.name,self.ise)
-        
-    def _updateState(self):
-        self.valve = self._toValue('VALVE_STATE')
-        self.boost = self._toValue('BOOST_STATE')
-        self.val = self._toValue('ACTUAL_TEMPERATURE')
-        self.ctl = self._toValue('SET_TEMPERATURE')
-        
-        datapoints = ['VALVE_STATE','ACTUAL_TEMPERATURE','SET_TEMPERATURE']
-        
-        for dptype in datapoints:
-            dp = self.data[dptype]
-            self.subnodes[dp['ise_id']] = '%(type)s: %(value)s %(valueunit)s' % dp
-                
-        #self.subnodes['val'] = 'Ist-Temperatur %s C' % self.val
-        #self.subnodes['ctrl'] = 'Soll-Temperatur: %s C' % self.ctl
-        #self.subnodes['valve'] = 'Ventil: %s %%' % self.valve
-        self.subnodes['mode'] = 'Modus: xyz'
-    
-    def add_commands(self, xmpp):
-        Device.add_commands(self, xmpp)
-
-        for dptype in ['VALVE_STATE','ACTUAL_TEMPERATURE','SET_TEMPERATURE']:
-            subnode = self.data[dptype]['ise_id']
-            xmpp['xep_0050'].add_command(node=self.ise + '/' + subnode,
-                                         handler=self._handle_cmd_ctrl_start)
-            xmpp['xep_0030'].add_feature(Command.namespace,self.ise + '/' + subnode,xmpp.boundjid)
     
     def _handle_cmd_ctrl_start(self, iq,session):
         'handle command to set temperature'
@@ -153,8 +118,7 @@ class Thermostat(Device):
         
         logging.info('%s is setting value of %s to %s ',session['from'],ise,newval)
         
-        res = self.hmc.setDataPoint(ise,newval)
-        print res
+        self.hmc.setDataPoint(ise,newval)
         
         session['notes'] = [('info','set value to %s' % newval)]
         
@@ -162,30 +126,35 @@ class Thermostat(Device):
         session['next'] = None
 
         return session
-
+    
+    def setValue(self,dptype,value):
+        ise=self.data[dptype]['ise_id']
+        self.hmc.setDataPoint(ise,value)
+    
+class Thermostat(Device):
+    dtype='HM-CC-RT-DN'
+    def __init__(self,hmc,ddict):
+        Device.__init__(self,hmc,ddict)
+        logging.debug("found Thermostat %r at %s",self.name,self.ise)
+        self.exposed_dps += ['VALVE_STATE','ACTUAL_TEMPERATURE','SET_TEMPERATURE']
+        self.writable_dps += ['SET_TEMPERATURE']
+        
+    def _updateState(self):
+        self.valve = self._toValue('VALVE_STATE')
+        self.boost = self._toValue('BOOST_STATE')
+        self.val = self._toValue('ACTUAL_TEMPERATURE')
+        self.ctl = self._toValue('SET_TEMPERATURE')
         
 class Blinds(Device):
     dtype='HM-LC-Bl1-FM'
     def __init__(self,hmc,ddict):
         Device.__init__(self,hmc,ddict)
         logging.debug("found Blinds %r at %s",self.name,self.ise)
+        self.exposed_dps += ['LEVEL']
+        self.writable_dps += ['LEVEL']
         
     def _updateState(self):
         self.level = self._toValue('LEVEL')
-        self.subnodes['lvl'] = 'Level %s' % self.level
-        
-    def add_commands(self, xmpp):
-        Device.add_commands(self, xmpp)
-        xmpp['xep_0050'].add_command(node=self.ise + '/lvl',
-                                     handler=self._handle_cmd_lvl)
-        xmpp['xep_0030'].add_feature(Command.namespace,self.ise + '/lvl',xmpp.boundjid)
-    
-    def _handle_cmd_lvl(self, iq,session):
-        'handle command to set level'
-        logging.info('called command to set level')
-                      
-        session['notes'] = [('info','wanna set level, eh?\nToo bad. Thats not implemented yet!')]
-        return session
 
 class Switch(Device):  
     dtype='HM-PB-6-WM55'

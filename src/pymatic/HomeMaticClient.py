@@ -19,7 +19,6 @@ class HomeMaticClient(object):
     def __init__(self, host):
         self.host = host
         self.PLACEHOLDER="http://%s/config/xmlapi/%s.cgi"
-        self.devs = self.getDevices()
 
     def _getUrl(self,action):
         return self.PLACEHOLDER % (self.host, action)
@@ -48,7 +47,10 @@ class HomeMaticClient(object):
         return self.getResultList('devicelist')       
         
     def getDevices(self):
-        return [hmdevs.createDeviceProxy(self, rdev) for rdev in self.getResultList('devicelist')]
+        #TBD get statelist for performance
+        devs= [hmdevs.createDeviceProxy(self, rdev) for rdev in self.getResultList('devicelist')]
+        for dev in devs: dev.update()
+        return devs
     
     def getDataPoints(self,deviceid=None):
         if deviceid == None:

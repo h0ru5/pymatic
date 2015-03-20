@@ -33,4 +33,6 @@ if __name__ == '__main__':
     xmpp = DeviceClient(fulljid, passwd,homematic)
     xmpp.owner = config.get('homematic','owner') 
     xmpp.connect()
+    
+    print "##### Entering Loop ####"
     xmpp.process(block=True)
