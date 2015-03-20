@@ -57,6 +57,12 @@ class HomeMaticClient(object):
             datapoints = self._getXmlObject('state', {'device_id' : deviceid}).getiterator('datapoint')
         return {dp.attrib['type']:dp.attrib for dp in datapoints} 
     
+    def setDataPoint(self,ise,data):
+        """set the data point specified by the ise to the given value"""
+        logging.debug('setting %s to %s',ise,data)
+        qs = {'ise_id' : ise, 'new_value' : data}
+        return self.getResultList('statechange',qs)
+        
         
 if __name__ == '__main__':
     #quick tests

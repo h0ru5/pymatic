@@ -46,13 +46,19 @@ class Device(object):
             
     def update(self):
         self.data = self.hmc.getDataPoints(self.ise)
-        self.rssi = self._toValue('RSSI_DEVICE')
-        self.rssi_peer = self._toValue('RSSI_DEVICE')
+        self.rssi_peer = self._toValue('RSSI_PEER')
         self.await_conf = self._toValue('CONFIG_PENDING')
-        self.subnodes['rssi'] = 'Signalstaerke: %s' % self.rssi
+        self.rssi = self._toValue('RSSI_DEVICE')
+        
+        dptype='RSSI_DEVICE'
+        # maybe I just output the type instead of pretty nanme
+        #for (dptype,name) in {'RSSI_DEVICE':'Signalstaerke'}:
+        dp = self.data[dptype]
+        self.subnodes[dp['ise_id']] = '%(type)s: %(value)s %(valueunit)s' % dp
+        
         self._updateState()
     
-    def handleItems(self, jid, node, ifrom):
+    def handleItems(self, jid, node, ifrom, args):
         'return info for device subnode (=datapoint)'
         logging.debug('custom node info request for %s -> %s', node, self.name)
         self.update()
@@ -62,14 +68,9 @@ class Device(object):
         
         return items
         
-        #dissect ise and subnode
-        # if has subnode return not found
-        # else
-        # update
-        # return subnodes with datapoint infos as name
-
     def add_commands(self, xmpp):
         'adds commands for this device'
+        self.xmpp = xmpp
         xmpp['xep_0050'].add_command(node=self.ise,
                                      name='info for %s' % self.name,
                                      handler=self._handle_cmd_info)
@@ -91,7 +92,11 @@ class Device(object):
     def _updateState(self):
         'overridden by subclasses - does python have abstract class?'
         pass        
-        
+    
+    def setValue(self,dptype,value):
+        ise=self.data[dptype]['ise_id']
+        self.hmc.setDataPoint(ise,value)
+    
 class Thermostat(Device):
     dtype='HM-CC-RT-DN'
     def __init__(self,hmc,ddict):
@@ -103,25 +108,61 @@ class Thermostat(Device):
         self.boost = self._toValue('BOOST_STATE')
         self.val = self._toValue('ACTUAL_TEMPERATURE')
         self.ctl = self._toValue('SET_TEMPERATURE')
-        self.subnodes['val'] = 'Ist-Temperatur %s C' % self.val
-        self.subnodes['ctrl'] = 'Soll-Temperatur: %s C' % self.ctl
-        self.subnodes['valve'] = 'Ventil: %s %%' % self.valve
+        
+        datapoints = ['VALVE_STATE','ACTUAL_TEMPERATURE','SET_TEMPERATURE']
+        
+        for dptype in datapoints:
+            dp = self.data[dptype]
+            self.subnodes[dp['ise_id']] = '%(type)s: %(value)s %(valueunit)s' % dp
+                
+        #self.subnodes['val'] = 'Ist-Temperatur %s C' % self.val
+        #self.subnodes['ctrl'] = 'Soll-Temperatur: %s C' % self.ctl
+        #self.subnodes['valve'] = 'Ventil: %s %%' % self.valve
         self.subnodes['mode'] = 'Modus: xyz'
     
     def add_commands(self, xmpp):
         Device.add_commands(self, xmpp)
-        xmpp['xep_0050'].add_command(node=self.ise + '/ctrl',
-                                     handler=self._handle_cmd_ctrl)
-        xmpp['xep_0030'].add_feature(Command.namespace,self.ise + '/ctrl',xmpp.boundjid)
+
+        for dptype in ['VALVE_STATE','ACTUAL_TEMPERATURE','SET_TEMPERATURE']:
+            subnode = self.data[dptype]['ise_id']
+            xmpp['xep_0050'].add_command(node=self.ise + '/' + subnode,
+                                         handler=self._handle_cmd_ctrl_start)
+            xmpp['xep_0030'].add_feature(Command.namespace,self.ise + '/' + subnode,xmpp.boundjid)
     
-    def _handle_cmd_ctrl(self, iq,session):
+    def _handle_cmd_ctrl_start(self, iq,session):
         'handle command to set temperature'
-        logging.info('called command to set temperature')
+        session['node'] = iq['command']['node']        
+        logging.info('called command to set ')
                       
-        session['notes'] = [('info','wanna set temperature, eh?\nToo bad. Thats not implemented yet!')]
+        form = self.xmpp['xep_0004'].makeForm('form', 'Set Value')
+        form['instructions'] = 'Enter the Value to set'
+        form.addField(var='new_value',
+                      ftype='text-single',
+                      label='New Value')
+
+        session['payload'] = form
+        session['next'] = self._handle_cmd_ctrl_finish
+        session['has_next'] = False
+        
         return session
     
-    
+    def _handle_cmd_ctrl_finish(self, payload,session):
+        form = payload
+        newval = form['values']['new_value']
+        ise = session['node'].split('/')[1]
+        
+        logging.info('%s is setting value of %s to %s ',session['from'],ise,newval)
+        
+        res = self.hmc.setDataPoint(ise,newval)
+        print res
+        
+        session['notes'] = [('info','set value to %s' % newval)]
+        
+        session['payload'] = None
+        session['next'] = None
+
+        return session
+
         
 class Blinds(Device):
     dtype='HM-LC-Bl1-FM'
