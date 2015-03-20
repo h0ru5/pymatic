@@ -43,6 +43,8 @@ class DeviceClient(ClientXMPP):
         # specify owner JID, * for everybody
         self.owner ='*' 
         
+        self.add_commands()
+        self.add_nodes() 
 
     def session_start(self, event):
         self.send_presence()
@@ -60,9 +62,6 @@ class DeviceClient(ClientXMPP):
         # except IqTimeout:
         #     logging.error('Server is taking too long to respond')
         #     self.disconnect()
-        
-        self.add_commands()
-        self.add_nodes() 
         
     def add_nodes(self):
         'query datapoints and create nodes'
