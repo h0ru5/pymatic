@@ -43,12 +43,13 @@ class DeviceClient(ClientXMPP):
         # specify owner JID, * for everybody
         self.owner ='*' 
         
-        self.add_commands()
-        self.add_nodes() 
+        
 
     def session_start(self, event):
         self.send_presence()
         self.get_roster()
+        self.add_commands()
+        self.add_nodes() 
 
         # Most get_*/set_* methods from plugins use Iq stanzas, which
         # can generate IqError and IqTimeout exceptions
