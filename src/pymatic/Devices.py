@@ -10,14 +10,14 @@ from sleekxmpp.plugins.xep_0050.stanza import Command
 
 def createDeviceProxy(hmc,ddict):
     dtype = ddict['device_type']
-    if dtype == Thermostat.dtype: 
-        return Thermostat(hmc,ddict)
-    elif dtype == Blinds.dtype: 
-        return Blinds(hmc,ddict)
-    elif dtype == Switch.dtype: 
-        return Switch(hmc,ddict)
-    else:
-        return Device(hmc,ddict)
+    devclasses = [Thermostat,Blinds,Switch,DoorLock]
+    
+    for dc in devclasses:
+        if dc.dtype==dtype: 
+            return dc(hmc,ddict)
+    
+    #no match
+    return Device(hmc,ddict) 
 
 class Device(object):
     '''
@@ -161,3 +161,13 @@ class Switch(Device):
     def __init__(self,hmc,ddict):
         Device.__init__(self,hmc,ddict)
         logging.debug("found Switch %r at %s",self.name,self.ise)
+
+class DoorLock(Device):
+    dtype='HM-Sec-Key'
+    def __init__(self,hmc,ddict):
+        Device.__init__(self,hmc,ddict)
+        logging.debug("found Doorlock %r at %s",self.name,self.ise)
+        self.exposed_dps += ['STATE','STATE_UNCERTAIN', 'OPEN']
+        self.writable_dps += ['STATE','OPEN']
+        
+        
